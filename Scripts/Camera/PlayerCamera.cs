@@ -5,7 +5,6 @@ using UnityEngine;
 public class PlayerCamera : MonoBehaviour
 {
     private Transform m_characterTransform;
-    private bool m_cameraIsMoving = false;
     private float m_cameraMovingSpeed = 3f;
 
     [SerializeField] float maxHorizontalOffset = 2f;
