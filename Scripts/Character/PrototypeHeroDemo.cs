@@ -51,7 +51,6 @@ public class PrototypeHeroDemo : MonoBehaviour {
     // Update is called once per frame
     void Update ()
     {
-        //Debug.Log("movementLocked: " + m_movementLocked);
         // Decrease timer that disables input movement. Used when attacking
         m_disableMovementTimer -= Time.deltaTime;
 
@@ -123,9 +122,9 @@ public class PrototypeHeroDemo : MonoBehaviour {
         if (!m_movementLocked && m_disableMovementTimer < 0.0f)
         {
             inputX = Input.GetAxis("Horizontal");
-            // GetAxisRaw returns either -1, 0 or 1
-            inputRaw = Input.GetAxisRaw("Horizontal");
         }
+        // GetAxisRaw returns either -1, 0 or 1
+        inputRaw = Input.GetAxisRaw("Horizontal");
         // Check if current move input is larger than 0 and the move direction is equal to the characters facing direction
         if (Mathf.Abs(inputRaw) > Mathf.Epsilon && Mathf.Sign(inputRaw) == m_facingDirection)
             m_moving = true;
