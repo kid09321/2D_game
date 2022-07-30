@@ -9,8 +9,9 @@ public class PrototypeHeroDemo : MonoBehaviour {
     [SerializeField] float      m_dashMultiplier = 10f;
     [SerializeField] float      m_dashCoolDown = 3f;
     [SerializeField] float      m_dashDuration = 0.2f;
-    [SerializeField] float      m_attackDuration = 0.4f;
+    [SerializeField] float      m_attackDuration = 0.7f;
     [SerializeField] float      m_attackCoolDown = 0.5f;
+    [SerializeField] float      m_attackTimeBetween = 0.1f;
     [SerializeField] bool       m_hideSword = false;
     [Header("Effects")]
     [SerializeField] GameObject m_RunStopDust;
@@ -35,6 +36,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
     private int                 m_currentAttackState = 0;
     private float               m_attackDurationTimer = 0.0f;
     private float               m_attackCoolDownTimer = 0.0f;
+    private float               m_attackTimeBetweenTimer = 0.0f;
 
     // Use this for initialization
     void Start ()
@@ -49,6 +51,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
     // Update is called once per frame
     void Update ()
     {
+        //Debug.Log("movementLocked: " + m_movementLocked);
         // Decrease timer that disables input movement. Used when attacking
         m_disableMovementTimer -= Time.deltaTime;
 
@@ -81,7 +84,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
         if (m_attacking)
         {
             m_animator.SetInteger("AnimState", 3);
-            m_attackDurationTimer -= Time.deltaTime;
+            m_attackDurationTimer += Time.deltaTime;
         }
 
         if (!m_movementLocked)
@@ -116,12 +119,13 @@ public class PrototypeHeroDemo : MonoBehaviour {
     void MovementHandler()
     {
         float inputX = 0.0f;
-
+        float inputRaw = 0.0f;
         if (!m_movementLocked && m_disableMovementTimer < 0.0f)
+        {
             inputX = Input.GetAxis("Horizontal");
-
-        // GetAxisRaw returns either -1, 0 or 1
-        float inputRaw = Input.GetAxisRaw("Horizontal");
+            // GetAxisRaw returns either -1, 0 or 1
+            inputRaw = Input.GetAxisRaw("Horizontal");
+        }
         // Check if current move input is larger than 0 and the move direction is equal to the characters facing direction
         if (Mathf.Abs(inputRaw) > Mathf.Epsilon && Mathf.Sign(inputRaw) == m_facingDirection)
             m_moving = true;
@@ -146,7 +150,6 @@ public class PrototypeHeroDemo : MonoBehaviour {
         float SlowDownSpeed = m_moving ? 1.0f : 0.5f;
         // Set movement
         m_body2d.velocity = new Vector2(inputX * m_maxSpeed * SlowDownSpeed, m_body2d.velocity.y);
-
         // Dash
         Dash(inputX);
     }
@@ -225,13 +228,26 @@ public class PrototypeHeroDemo : MonoBehaviour {
             }
             m_currentAttackState += 1;
             m_animator.SetInteger("AnimState", 3);
-            m_attackDurationTimer = m_attackDuration;        
+            m_attackDurationTimer = 0.0f;
+            m_attackTimeBetweenTimer = 0.0f;
         }
-        if(m_attackDurationTimer <= 0)
+        else if(Input.GetKeyDown(KeyCode.Z))
         {
-            m_attacking = false;
-            m_movementLocked = false;
+            Debug.Log("m_attacking:" + m_attacking);
+            Debug.Log("m_attackCoolDownTimer:" + m_attackCoolDownTimer);
         }
+        // To lock the movement when comboing.
+        // After one attack duration is over, attacking set to false first.
+        // Then check if there is next attack in m_attackTimeBetween, if not, unlock the movement.
+        if (m_attackDurationTimer >= m_attackDuration)
+        {
+            m_attacking = false;        
+            if (m_attackTimeBetweenTimer > m_attackTimeBetween)
+            {
+                m_movementLocked = false;
+            }
+            m_attackTimeBetweenTimer += Time.deltaTime;
+        }       
         m_attackCoolDownTimer -= Time.deltaTime;
     }
 
@@ -266,7 +282,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
 
     void AE_AttackEnd()
     {
-        m_attacking = false;
-        m_movementLocked = false;
+        Debug.Log("EndAttackEvent Called");
+        //m_attackTimeBetweenTimer = m_attackTimeBetween;       
     }
 }
