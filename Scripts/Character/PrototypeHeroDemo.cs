@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class PrototypeHeroDemo : MonoBehaviour {
 
@@ -13,6 +14,8 @@ public class PrototypeHeroDemo : MonoBehaviour {
     [SerializeField] float      m_attackCoolDown = 0.5f;
     [SerializeField] float      m_attackTimeBetween = 0.1f;
     [SerializeField] bool       m_hideSword = false;
+    [SerializeField] int        m_maxEnemiesToAttack = 10;
+    [SerializeField] Collider2D m_attackRegion;
     [Header("Effects")]
     [SerializeField] GameObject m_RunStopDust;
     [SerializeField] GameObject m_JumpDust;
@@ -33,10 +36,12 @@ public class PrototypeHeroDemo : MonoBehaviour {
     private float               m_dashCoolDownTimer = 0.0f;
     private float               m_dashDurationTimer = 0.0f;
 
+    // Used for combat
     private int                 m_currentAttackState = 0;
     private float               m_attackDurationTimer = 0.0f;
     private float               m_attackCoolDownTimer = 0.0f;
     private float               m_attackTimeBetweenTimer = 0.0f;
+    private List<Collider2D>    m_damagedColliders;
 
     // Use this for initialization
     void Start ()
@@ -46,6 +51,9 @@ public class PrototypeHeroDemo : MonoBehaviour {
         m_audioSource = GetComponent<AudioSource>();
         m_audioManager = AudioManager_PrototypeHero.instance;
         m_groundSensor = transform.Find("GroundSensor").GetComponent<Sensor_Prototype>();
+
+        m_damagedColliders = new List<Collider2D>();
+
     }
 
     // Update is called once per frame
@@ -79,7 +87,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
         m_animator.SetLayerWeight(1, boolInt);
 
         //Attack
-        Attack();
+        HandleAttack();
         if (m_attacking)
         {
             m_animator.SetInteger("AnimState", 3);
@@ -135,13 +143,15 @@ public class PrototypeHeroDemo : MonoBehaviour {
         // Swap direction of sprite depending on move direction
         if (inputRaw > 0)
         {
-            GetComponent<SpriteRenderer>().flipX = false;
+            //GetComponent<SpriteRenderer>().flipX = true;
+            transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
             m_facingDirection = 1;
         }
 
         else if (inputRaw < 0)
         {
-            GetComponent<SpriteRenderer>().flipX = true;
+            //GetComponent<SpriteRenderer>().flipX = false;
+            transform.localScale = new Vector3(-Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
             m_facingDirection = -1;
         }
 
@@ -150,7 +160,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
         // Set movement
         m_body2d.velocity = new Vector2(inputX * m_maxSpeed * SlowDownSpeed, m_body2d.velocity.y);
         // Dash
-        Dash(inputX);
+        Dash();
     }
     // Function used to spawn a dust effect
     // All dust effects spawns on the floor
@@ -161,7 +171,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
         if (dust != null)
         {
             // Set dust spawn position
-            Vector3 dustSpawnPosition = transform.position + new Vector3(dustXOffset * m_facingDirection, 0.0f, 0.0f);
+            Vector3 dustSpawnPosition = transform.position + new Vector3(dustXOffset * m_facingDirection, -0.5f, 0.0f);
             GameObject newDust = Instantiate(dust, dustSpawnPosition, Quaternion.identity) as GameObject;
             // Turn dust in correct X direction
             newDust.transform.localScale = newDust.transform.localScale.x * new Vector3(m_facingDirection, 1, 1);
@@ -169,7 +179,7 @@ public class PrototypeHeroDemo : MonoBehaviour {
     }
 
     // Movements
-    void Dash(float inputX)
+    void Dash()
     {
         if (Input.GetKeyDown(KeyCode.LeftShift))
         {
@@ -186,13 +196,13 @@ public class PrototypeHeroDemo : MonoBehaviour {
             if (m_dashDurationTimer > 0)
             {
                 m_dashDurationTimer -= Time.deltaTime;
-                m_body2d.velocity = new Vector2(inputX * m_maxSpeed * m_dashMultiplier, m_body2d.velocity.y);
+                m_body2d.velocity = new Vector2(m_facingDirection * m_maxSpeed * m_dashMultiplier, m_body2d.velocity.y);
             }
             else
             {
                 Debug.Log("not dashing");
                 m_dashing = false;
-                m_body2d.velocity = new Vector2(inputX * m_maxSpeed, m_body2d.velocity.y);
+                //m_body2d.velocity = new Vector2(m_facingDirection * m_maxSpeed, m_body2d.velocity.y);
             }
         }
         else
@@ -204,13 +214,14 @@ public class PrototypeHeroDemo : MonoBehaviour {
         }
     }
 
-    // Attack
-    void Attack()
+    // AttackHandler
+    void HandleAttack()
     {
         if (Input.GetKeyDown(KeyCode.Z) && !m_attacking && m_attackCoolDownTimer <= 0)
         {            
             m_attacking = true;
             m_movementLocked = true;
+            m_damagedColliders.Clear();
             switch (m_currentAttackState % 3)
             {
                 case 0:
@@ -230,10 +241,11 @@ public class PrototypeHeroDemo : MonoBehaviour {
             m_attackDurationTimer = 0.0f;
             m_attackTimeBetweenTimer = 0.0f;
         }
-        else if(Input.GetKeyDown(KeyCode.Z))
+
+
+        if(m_animator.GetFloat("Weapon.Active") > 0f)
         {
-            Debug.Log("m_attacking:" + m_attacking);
-            Debug.Log("m_attackCoolDownTimer:" + m_attackCoolDownTimer);
+            Attack();
         }
         // To lock the movement when comboing.
         // After one attack duration is over, attacking set to false first.
@@ -250,6 +262,25 @@ public class PrototypeHeroDemo : MonoBehaviour {
         m_attackCoolDownTimer -= Time.deltaTime;
     }
 
+    void Attack()
+    {
+        Collider2D[] attackCandidates = new Collider2D[m_maxEnemiesToAttack];
+        ContactFilter2D filter = new ContactFilter2D();
+        filter.useTriggers = true;
+        int collidersCount = Physics2D.OverlapCollider(m_attackRegion, filter, attackCandidates);
+
+        for(int i = 0; i < collidersCount; i++)
+        {
+            if (m_damagedColliders.Contains(attackCandidates[i])) continue;
+            EnemyBehavior enemyBehavior = attackCandidates[i].GetComponent<EnemyBehavior>();
+            if(enemyBehavior != null)
+            {
+                enemyBehavior.Damaged(5, this.gameObject);
+                m_damagedColliders.Add(attackCandidates[i]);
+                Debug.Log("Attack enemy: " + enemyBehavior.gameObject.name);
+            }
+        }
+    }
     // Animation Events
     // These functions are called inside the animation files
     void AE_runStop()

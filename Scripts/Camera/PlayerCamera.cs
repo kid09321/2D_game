@@ -5,10 +5,10 @@ using UnityEngine;
 public class PlayerCamera : MonoBehaviour
 {
     private Transform m_characterTransform;
-    private float m_cameraMovingSpeed = 3f;
 
     [SerializeField] float maxHorizontalOffset = 2f;
     [SerializeField] float maxVerticalOffset = 3f;
+    [SerializeField] float m_cameraMovingSpeed = 2f;
 
     // Start is called before the first frame update
     void Start()
